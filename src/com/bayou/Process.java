@@ -39,7 +39,6 @@ public abstract class Process extends Thread{
 		writer.close();                
 	}
 	public void sendMessage(String destProcessId, BayouMessage msg) throws Exception{
-		msg.setSrcId(this.processId);
 		main.sendMessage(this.processId,destProcessId, msg);
 	}
 
