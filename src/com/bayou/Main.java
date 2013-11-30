@@ -1,9 +1,14 @@
 package com.bayou;
 
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import com.bayou.common.BayouMessage;
+import com.bayou.common.BayouMessageEnum;
 
 public class Main {
 	public Map<String, Process> processes=new HashMap<String, Process>();
@@ -11,6 +16,7 @@ public class Main {
 	public final static int nReplicas = 2;
 
 	synchronized public void sendMessage(String srcProcessId,String destProcessId, BayouMessage msg) throws Exception{
+		msg.setSrcId(srcProcessId);
 		Process p = processes.get(destProcessId);        
 		if(p!=null) {
 			p.deliver(msg);
@@ -31,7 +37,23 @@ public class Main {
 	}
 
 	void run() throws Exception {
-
+		//spawning replicas
+		BufferedReader br = new BufferedReader(new FileReader("TOPOLOGY.txt"));
+		String temp = null;
+		while((temp = br.readLine()) != null) {
+			String[] vals = temp.split(" ");
+			if(!vals[1].equals("-1") && processes.get("REPLICA:"+vals[1])==null) throw new Exception("MAIN: REPLICA:"+vals[1]+" is not yet created");
+			if(processes.get("REPLICA:"+vals[0])==null) {
+				Replica r = new Replica(this, "REPLICA:"+vals[0], Integer.parseInt(vals[1]));
+				addProcess("REPLICA:"+vals[0],r);
+			} else {
+				BayouMessage msg = new BayouMessage();
+				msg.setMessageType(BayouMessageEnum.ADD_NEIGHBOR);
+				msg.setReplicaId(((Replica)processes.get("REPLICA:"+vals[0])).replicaId);
+				sendMessage("MAIN", "REPLICA:"+vals[1], msg);
+			}
+			Thread.sleep(2);
+		}
 	}
 
 	public static void main(String args[]) throws Exception {
