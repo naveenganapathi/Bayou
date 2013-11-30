@@ -54,6 +54,19 @@ public class Main {
 			}
 			Thread.sleep(2);
 		}
+		br.close();
+
+		//spawning clients
+		for(int i=0;i<nClients;i++) {
+			Client c = new Client(this, "CLIENT:"+i);
+			addProcess("CLIENT:"+i,c);
+		}
+
+		for(int i=0;i<nClients;i++) {
+			BayouMessage m = new BayouMessage();
+			m.setMessageType(BayouMessageEnum.CLIENT_INPUT);
+			sendMessage("MAIN","CLIENT:"+i, m);
+		}
 	}
 
 	public static void main(String args[]) throws Exception {
