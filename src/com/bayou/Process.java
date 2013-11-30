@@ -26,6 +26,19 @@ public abstract class Process extends Thread{
 
 	abstract public void body() throws Exception;
 
+	public void clearAndWriteFile(String s, String fileExt) {
+		String temp = processId.replace(":", "_").replace(",","_");
+		try {
+			this.writer = new PrintWriter(new FileWriter(temp+fileExt+".txt", false));
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		System.out.println(processId+":"+s);
+		writer.println(s);
+		writer.close(); 
+	}
+	
 	public void writeToLog(String s) {
 		String temp = processId.replace(":", "_").replace(",","_");
 		try {
@@ -35,7 +48,7 @@ public abstract class Process extends Thread{
 			e.printStackTrace();
 		}
 		System.out.println(processId+":"+s);
-		writer.println(processId+" : "+s);
+		writer.println(s);
 		writer.close();                
 	}
 	public void sendMessage(String destProcessId, BayouMessage msg) throws Exception{
