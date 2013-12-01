@@ -107,6 +107,24 @@ public class Replica extends Process {
 
 	@Override
 	public void body() throws Exception {
+		boolean isCreated = false;
+		BayouMessage toRemove = null;
+		while(!isCreated && !isPrimary) {
+			for(BayouMessage mesg : messages.list) {
+				if(BayouMessageEnum.CREATE_WRITE_RESP.equals(mesg.getMessageType())) {
+					this.replicaId = mesg.getReplicaId();
+					this.neighbors.add(mesg.getParentReplicaId());
+					this.versionVector.put(this.replicaId, 0L);
+					main.processMap.put(replicaId, processId);
+					toRemove = mesg;
+					isCreated = true;
+					break;
+				}
+			}
+			Thread.sleep(100);
+		}
+		messages.list.remove(toRemove);
+		
 		while(true) {
 			BayouMessage bMessage = getNextMessage();
 			if(BayouMessageEnum.ADD_NEIGHBOR.equals(bMessage.getMessageType())) {
@@ -121,13 +139,6 @@ public class Replica extends Process {
 				msg.setParentReplicaId(this.replicaId);
 				neighbors.add(newReplicaId);
 				sendMessage(bMessage.getSrcId(), msg);
-			} else if(BayouMessageEnum.CREATE_WRITE_RESP.equals(bMessage.getMessageType())) {
-				this.replicaId = bMessage.getReplicaId();
-				this.neighbors.add(bMessage.getParentReplicaId());
-				this.versionVector.put(this.replicaId, 0L);
-				main.processMap.put(replicaId, processId);
-				//System.out.println("Node Created with ID - "+replicaId);
-				//System.out.println("Neighbors of node is - "+neighbors);
 			} else if(BayouMessageEnum.REQUEST.equals(bMessage.getMessageType())) {
 				long clock = versionVector.get(this.replicaId);
 				versionVector.put(this.replicaId, clock+1);

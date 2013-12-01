@@ -15,6 +15,7 @@ public class Main {
 	public final static int nClients = 2;
 	public final static int nReplicas = 4;
 	public Map<List<Long>,String> processMap =  new HashMap<List<Long>,String>();
+	public boolean pause = false;
 
 	synchronized public void sendMessage(String srcProcessId,String destProcessId, BayouMessage msg) throws Exception{
 		msg.setSrcId(srcProcessId);
@@ -68,6 +69,10 @@ public class Main {
 			m.setMessageType(BayouMessageEnum.CLIENT_INPUT);
 			sendMessage("MAIN","CLIENT:"+i, m);
 		}
+		
+		//spawning user input listener
+		UserInputListener ul = new UserInputListener(this, "UIL");
+        addProcess("UIL", ul);
 	}
 
 	public static void main(String args[]) throws Exception {

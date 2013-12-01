@@ -1,12 +1,16 @@
 package com.bayou.common;
 
 public enum UserRequestEnum {
-	ISOLATE("isolate"),
 	PAUSE("pause"),
-	RESUME("resume"),
-	ADD("add"),
-	RETIRE("retire"),
-	CONNECT("connect");
+	CONTINUE("continue"),
+	PRINT_ALL_LOG("print-all-log"),
+	PRINT_LOG("print-log"),
+	ISOLATE("isolate"),
+	RECONNECT("reconnect"),
+	BREAK_CONNECTION("break-connection"),
+	RECOVER_CONNECTION("recover-connection"),
+	JOIN("join"),
+	LEAVE("leave");
 	String messageLabel;
 	UserRequestEnum(String message) {
             this.messageLabel=message;
