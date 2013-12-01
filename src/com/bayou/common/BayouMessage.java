@@ -1,14 +1,21 @@
 package com.bayou.common;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class BayouMessage {
 	BayouMessageEnum messageType;
 	String srcId;
+	int CSN;
 	List<Long> replicaId;
 	List<Long> parentReplicaId;
+	Map<List<Long>,Long> versionVector;
 	BayouRequest request;
+	List<BayouMessage> tentativeMessages;
+	List<BayouMessage> commitMessages;
 
+	
 	public BayouMessageEnum getMessageType() {
 		return messageType;
 	}
@@ -47,5 +54,46 @@ public class BayouMessage {
 
 	public void setParentReplicaId(List<Long> parentReplicaId) {
 		this.parentReplicaId = parentReplicaId;
+	}
+
+	public Map<List<Long>, Long> getVersionVector() {
+		return versionVector;
+	}
+
+	public void setVersionVector(Map<List<Long>, Long> versionVector) {
+		this.versionVector = versionVector;
+	}
+
+	public List<BayouMessage> getTentativeMessages() {
+		return tentativeMessages;
+	}
+
+	public void setTentativeMessages(List<BayouMessage> writeMessages) {
+		this.tentativeMessages = writeMessages;
+	}
+
+	@Override
+	public String toString() {
+		return "BayouMessage [messageType=" + messageType + ", srcId=" + srcId
+				+ ", replicaId=" + replicaId + ", parentReplicaId="
+				+ parentReplicaId + ", versionVector=" + versionVector
+				+ ", request=" + request + ", writeMessages=" + tentativeMessages
+				+ "]";
+	}
+
+	public int getCSN() {
+		return CSN;
+	}
+
+	public void setCSN(int cSN) {
+		CSN = cSN;
+	}
+
+	public List<BayouMessage> getCommitMessages() {
+		return commitMessages;
+	}
+
+	public void setCommitMessages(List<BayouMessage> commitMessages) {
+		this.commitMessages = commitMessages;
 	}
 }

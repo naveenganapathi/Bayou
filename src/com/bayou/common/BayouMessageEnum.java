@@ -5,7 +5,10 @@ public enum BayouMessageEnum {
 	CREATE_WRITE_RESP("create-write-response"),
 	CLIENT_INPUT("client-input"),
 	ADD_NEIGHBOR("add-neighbor"),
-	REQUEST("request");
+	REQUEST("request"),
+	INIT_ENTROPY("init-entropy"),
+	INIT_ENTROPY_RESP("init-entropy-resp"),
+	ENTROPY_ADD_WRITES("entropy-add-writes");
 	String messageLabel;
 	BayouMessageEnum(String message) {
             this.messageLabel=message;
