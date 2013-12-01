@@ -1,4 +1,4 @@
-ADD,Song 1,Song 1 URL,0
-ADD,Song 2,Song 2 URL,0
+ADD,Song asd1,Song 1 URL,1
+ADD,Song 2,Song 2 URL,1
 DELETE,Song 2,Song 2 URL,1
-EDIT,Song 1,Song 2 URL,1
+EDIT,Song 1,Song 2 URL,2

@@ -13,7 +13,7 @@ import com.bayou.common.BayouMessageEnum;
 public class Main {
 	public Map<String, Process> processes=new HashMap<String, Process>();
 	public final static int nClients = 2;
-	public final static int nReplicas = 2;
+	public final static int nReplicas = 4;
 	public Map<List<Long>,String> processMap =  new HashMap<List<Long>,String>();
 
 	synchronized public void sendMessage(String srcProcessId,String destProcessId, BayouMessage msg) throws Exception{

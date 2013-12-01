@@ -62,7 +62,7 @@ public class Replica extends Process {
 	public Replica(Main env, String procId, int addUnder) throws Exception {
 		this.main = env;
 		this.processId = procId;
-		scheduler.scheduleAtFixedRate(startEntropy, 500, 300, TimeUnit.MILLISECONDS);
+		scheduler.scheduleAtFixedRate(startEntropy, 5, 3, TimeUnit.SECONDS);
 		if(addUnder==-1) { 
 			replicaId.add(System.currentTimeMillis());
 			this.isPrimary = true;
@@ -81,8 +81,8 @@ public class Replica extends Process {
 		StringBuffer br = new StringBuffer();
 		br.append(this.replicaId+"\n");
 		for(BayouMessage bm : bmList) {
-			String s = bm.getRequest().getOperation()
-					+","+bm.getRequest().getKey()+","
+			String s =bm.getReplicaId()+","+bm.getRequest().getAcceptStamp()+":"+bm.getRequest().getOperation()
+					+","+bm.getRequest().getKey()
 					+","+bm.getRequest().getValue();			
 			br.append(s+"\n");
 		}		
