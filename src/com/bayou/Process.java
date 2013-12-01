@@ -23,6 +23,9 @@ public abstract class Process extends Thread{
 		main.removeProcess(processId);
 	}
 
+	public boolean canSend(String p) {
+		return true;
+	}
 
 	abstract public void body() throws Exception;
 

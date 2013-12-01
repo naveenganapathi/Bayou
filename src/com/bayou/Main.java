@@ -19,9 +19,14 @@ public class Main {
 
 	synchronized public void sendMessage(String srcProcessId,String destProcessId, BayouMessage msg) throws Exception{
 		msg.setSrcId(srcProcessId);
-		Process p = processes.get(destProcessId);        
+		Process p = processes.get(destProcessId);
+		Process s = processes.get(srcProcessId);
+		System.out.println(srcProcessId+" "+destProcessId+" "+(s==null)+" "+msg.getMessageType());
+		System.out.println("msg"+msg);
+		if(srcProcessId.equals("MAIN") || s.canSend(destProcessId)) {
 		if(p!=null) {
 			p.deliver(msg);
+		}
 		}
 	}
 
@@ -30,6 +35,7 @@ public class Main {
 			System.err.println("Process Id ("+processId+") already present in the list of processes");
 			return;
 		}
+		System.out.println("Adding process - "+processId);
 		processes.put(processId,process);
 		process.start();
 	}
@@ -46,8 +52,10 @@ public class Main {
 			String[] vals = temp.split(" ");
 			if(!vals[1].equals("-1") && processes.get("REPLICA:"+vals[1])==null) throw new Exception("MAIN: REPLICA:"+vals[1]+" is not yet created");
 			if(processes.get("REPLICA:"+vals[0])==null) {
+				System.out.println("creating replica - "+vals[0]);
 				Replica r = new Replica(this, "REPLICA:"+vals[0], Integer.parseInt(vals[1]));
-				addProcess("REPLICA:"+vals[0],r);
+				System.out.println("Created replica - "+vals[0]);
+				//addProcess("REPLICA:"+vals[0],r);
 			} else {
 				BayouMessage msg = new BayouMessage();
 				msg.setMessageType(BayouMessageEnum.ADD_NEIGHBOR);

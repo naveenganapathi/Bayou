@@ -1,4 +1,5 @@
 package com.bayou;
+import java.util.List;
 import java.util.Scanner;
 
 import com.bayou.common.UserRequest;
@@ -18,12 +19,22 @@ public class UserInputListener extends Process {
 		String arr[] = s.split(",");		
 		if(UserRequestEnum.ISOLATE.equals(UserRequestEnum.valueOf(arr[0]))) {
 			r.setOperation(UserRequestEnum.ISOLATE);
-			r.setSrcId(arr[1]);
-			r.setDestId(arr[2]);			
+			r.setSrcId(arr[1]);			
 		} else if(UserRequestEnum.PAUSE.equals(UserRequestEnum.valueOf(arr[0]))) {
 			r.setOperation(UserRequestEnum.PAUSE);
 		} else if(UserRequestEnum.CONTINUE.equals(UserRequestEnum.valueOf(arr[0]))) {
 			r.setOperation(UserRequestEnum.CONTINUE);
+		} else if (UserRequestEnum.RECONNECT.equals(UserRequestEnum.valueOf(arr[0]))) {
+			r.setOperation(UserRequestEnum.RECONNECT);
+			r.setSrcId(arr[1]);
+		} else if (UserRequestEnum.BREAK_CONNECTION.equals(UserRequestEnum.valueOf(arr[0]))) {
+			r.setOperation(UserRequestEnum.BREAK_CONNECTION);
+			r.setSrcId(arr[1]);
+			r.setDestId(arr[2]);
+		} else if (UserRequestEnum.RECOVER_CONNECTION.equals(UserRequestEnum.valueOf(arr[0]))) {
+			r.setOperation(UserRequestEnum.RECOVER_CONNECTION);
+			r.setSrcId(arr[1]);
+			r.setDestId(arr[2]);
 		}
 
 		// to include other stuff as and when necessary.
@@ -37,7 +48,8 @@ public class UserInputListener extends Process {
 			case CONTINUE:
 				this.main.pause = false;
 				break;
-			case ISOLATE:
+			case ISOLATE:				
+				alterNeighborStates(r.getSrcId(),false);
 				break;
 			case JOIN:
 				break;
@@ -51,12 +63,44 @@ public class UserInputListener extends Process {
 			case PRINT_LOG:
 				break;
 			case RECONNECT:
+				alterNeighborStates(r.getSrcId(), true);
 				break;
 			case RECOVER_CONNECTION:
 				break;			
 		}
 	}
 
+	public void alterNeighborStates(String pid, boolean val) {
+		System.out.println("Pid neighbou sate"+pid);
+		Replica r = (Replica) main.processes.get(pid);
+		
+		//remove all neighbours from src.
+		for(List<Long> key : r.neighbors.keySet()) {
+			r.neighbors.put(key, val);
+		}
+		
+		//remove src from all other replicas.
+		for(Process p : main.processes.values()) {
+			if(p instanceof Replica) {
+				Replica a = (Replica) p;
+				if(a.neighbors.containsKey(r.replicaId)) {
+					a.neighbors.put(r.replicaId, val);
+				}
+			}
+		}		
+	}
+	
+	public void changeConnectionState(String src,String dest, boolean val) {
+		Replica r1 = (Replica) main.processes.get(src);
+		Replica r2 = (Replica) main.processes.get(dest);
+		if(r1.neighbors.containsKey(r2.replicaId)) {
+			r1.neighbors.put(r2.replicaId, val);
+		}
+		if(r2.neighbors.containsKey(r1.replicaId)) {
+			r2.neighbors.put(r1.replicaId, val);
+		}
+	}
+	
 	public void body() {
 		Scanner reader = new Scanner(System.in);
 		while(true) {

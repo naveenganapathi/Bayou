@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -24,7 +25,7 @@ public class Replica extends Process {
 	Map<String,String> playList = new HashMap<String,String>();
 	private List<BayouMessage> commitedWrites = new ArrayList<BayouMessage>();
 	List<BayouMessage> tentativeWrites = new ArrayList<BayouMessage>();
-	List<List<Long>> neighbors = new ArrayList<List<Long>>();
+	Map<List<Long>,Boolean> neighbors = new HashMap<List<Long>,Boolean>();
 
 	Runnable startEntropy = new Runnable() {
 		public void run() { 
@@ -35,13 +36,19 @@ public class Replica extends Process {
 				System.out.println("comitted :"+commitedWrites.size()+" writes!");
 			}			
 			System.out.println(processId+": Initiating Entropy");
-			for(List<Long> neighbor : neighbors) {
+			for(Entry<List<Long>,Boolean> neighborEntry : neighbors.entrySet()) {
+				if(neighborEntry.getValue() == false) {
+					continue;
+				}			
+				List<Long> neighbor = neighborEntry.getKey();
 				BayouMessage msg = new BayouMessage();
 				System.out.println(processId+" sending init entropy to :"+main.processMap.get(neighbor));
 				msg.setReplicaId(replicaId);
 				msg.setMessageType(BayouMessageEnum.INIT_ENTROPY);
 				try {
+					System.out.println("sending msg");
 					sendMessage(main.processMap.get(neighbor), msg);
+					System.out.println("returning from send msg");
 				} catch (Exception e) {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
@@ -61,10 +68,24 @@ public class Replica extends Process {
 		}
 	}
 
+	
+	@Override
+	public boolean canSend(String pid) {
+		Process p = main.processes.get(pid);
+		if(p instanceof Replica) {
+			Replica r = (Replica) p;
+			if(neighbors.get(r.replicaId) == null ||
+					neighbors.get(r.replicaId) == false)
+				return false;
+		}
+		return true;
+	}
+	
 	public Replica(Main env, String procId, int addUnder) throws Exception {
 		this.main = env;
 		this.processId = procId;
-		scheduler.scheduleAtFixedRate(startEntropy, 5, 3, TimeUnit.SECONDS);
+		scheduler.scheduleWithFixedDelay(startEntropy, 5, 3, TimeUnit.SECONDS);
+		this.main.processes.put(procId, this);
 		if(addUnder==-1) { 
 			replicaId.add(System.currentTimeMillis());
 			this.isPrimary = true;
@@ -115,7 +136,7 @@ public class Replica extends Process {
 			for(BayouMessage mesg : messages.list) {
 				if(BayouMessageEnum.CREATE_WRITE_RESP.equals(mesg.getMessageType())) {
 					this.replicaId = mesg.getReplicaId();
-					this.neighbors.add(mesg.getParentReplicaId());
+					this.neighbors.put(mesg.getParentReplicaId(),true);
 					this.versionVector.put(this.replicaId, 0L);
 					main.processMap.put(replicaId, processId);
 					toRemove = mesg;
@@ -130,7 +151,7 @@ public class Replica extends Process {
 		while(true) {
 			BayouMessage bMessage = getNextMessage();
 			if(BayouMessageEnum.ADD_NEIGHBOR.equals(bMessage.getMessageType())) {
-				neighbors.add(bMessage.getReplicaId());
+				neighbors.put(bMessage.getReplicaId(),true);
 			} else if(BayouMessageEnum.CREATE_WRITE.equals(bMessage.getMessageType())) {
 				List<Long> newReplicaId = new ArrayList<Long>();
 				newReplicaId.add(System.currentTimeMillis());
@@ -139,7 +160,7 @@ public class Replica extends Process {
 				msg.setMessageType(BayouMessageEnum.CREATE_WRITE_RESP);
 				msg.setReplicaId(newReplicaId);
 				msg.setParentReplicaId(this.replicaId);
-				neighbors.add(newReplicaId);
+				neighbors.put(newReplicaId,true);
 				sendMessage(bMessage.getSrcId(), msg);
 			} else if(BayouMessageEnum.REQUEST.equals(bMessage.getMessageType())) {
 				long clock = versionVector.get(this.replicaId);
