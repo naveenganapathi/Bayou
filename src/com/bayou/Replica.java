@@ -16,6 +16,16 @@ import com.bayou.common.BayouRequestEnum;
 public class Replica extends Process {
 
 	private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+	
+	boolean isPrimary = false;
+	List<Long> replicaId = new ArrayList<Long>();
+	Map<List<Long>,Long> versionVector =  new HashMap<List<Long>,Long>();
+	int CSN = 0;
+	Map<String,String> playList = new HashMap<String,String>();
+	private List<BayouMessage> commitedWrites = new ArrayList<BayouMessage>();
+	List<BayouMessage> tentativeWrites = new ArrayList<BayouMessage>();
+	List<List<Long>> neighbors = new ArrayList<List<Long>>();
+
 	Runnable startEntropy = new Runnable() {
 		public void run() { 
 			
@@ -39,15 +49,7 @@ public class Replica extends Process {
 			}
 		}
 	};
-	boolean isPrimary = false;
-	List<Long> replicaId = new ArrayList<Long>();
-	Map<List<Long>,Long> versionVector =  new HashMap<List<Long>,Long>();
-	int CSN = 0;
-	Map<String,String> playList = new HashMap<String,String>();
-	private List<BayouMessage> commitedWrites = new ArrayList<BayouMessage>();
-	List<BayouMessage> tentativeWrites = new ArrayList<BayouMessage>();
-	List<List<Long>> neighbors = new ArrayList<List<Long>>();
-
+	
 	public  void commitTentativeWrites() {
 		synchronized(tentativeWrites) {
 			for(BayouMessage m : tentativeWrites) {

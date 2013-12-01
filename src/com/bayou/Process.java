@@ -55,7 +55,8 @@ public abstract class Process extends Thread{
 		main.sendMessage(this.processId,destProcessId, msg);
 	}
 
-	public void deliver(BayouMessage msg) throws InterruptedException {
+
+	public void deliver(BayouMessage msg) throws Exception {
 		while(this.main.pause) {Thread.sleep(100);}
 		messages.enqueue(msg);
 	}
