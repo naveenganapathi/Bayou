@@ -55,13 +55,13 @@ public abstract class Process extends Thread{
 		main.sendMessage(this.processId,destProcessId, msg);
 	}
 
-	public void deliver(BayouMessage msg) {
-		while(this.main.pause) {}//System.out.println("SEND SEND SEND WAIT WAIT WAIT");}
+	public void deliver(BayouMessage msg) throws Exception {
+		while(this.main.pause) {Thread.sleep(100);}
 		messages.enqueue(msg);
 	}
 
 	public BayouMessage getNextMessage() throws Exception{
-		while(this.main.pause) {System.out.println("RECEIVE WAIT WAIT WAIT");}
+		while(this.main.pause) {Thread.sleep(100);}
 		return messages.dequeue();
 	}
 
