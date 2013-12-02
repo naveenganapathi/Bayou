@@ -136,16 +136,18 @@ public class Replica extends Process {
 		boolean isCreated = false;
 		BayouMessage toRemove = null;
 		while(!isCreated && !isPrimary) {
-			List<BayouMessage> msgs = new ArrayList<BayouMessage>(messages.list);
-			for(BayouMessage mesg : msgs) {
-				if(BayouMessageEnum.CREATE_WRITE_RESP.equals(mesg.getMessageType())) {
-					this.replicaId = mesg.getReplicaId();
-					this.neighbors.put(mesg.getParentReplicaId(),true);
-					this.versionVector.put(this.replicaId, System.currentTimeMillis());
-					main.processMap.put(replicaId, processId);
-					toRemove = mesg;
-					isCreated = true;
-					break;
+			if(!messages.list.isEmpty()) {
+				List<BayouMessage> msgs = new ArrayList<BayouMessage>(messages.list);
+				for(BayouMessage mesg : msgs) {
+					if(BayouMessageEnum.CREATE_WRITE_RESP.equals(mesg.getMessageType())) {
+						this.replicaId = mesg.getReplicaId();
+						this.neighbors.put(mesg.getParentReplicaId(),true);
+						this.versionVector.put(this.replicaId, System.currentTimeMillis());
+						main.processMap.put(replicaId, processId);
+						toRemove = mesg;
+						isCreated = true;
+						break;
+					}
 				}
 			}
 			Thread.sleep(100);
@@ -156,6 +158,7 @@ public class Replica extends Process {
 			BayouMessage bMessage = getNextMessage();
 			if(BayouMessageEnum.ADD_NEIGHBOR.equals(bMessage.getMessageType())) {				
 				neighbors.put(bMessage.getReplicaId(),true);
+				//System.out.println(this.processId+": Added "+bMessage.getReplicaId()+" to the neighbor list. Message - "+bMessage);
 			} else if(BayouMessageEnum.CREATE_WRITE.equals(bMessage.getMessageType())) {
 				List<Long> newReplicaId = new ArrayList<Long>();
 				newReplicaId.add(System.currentTimeMillis());
@@ -166,6 +169,7 @@ public class Replica extends Process {
 				msg.setParentReplicaId(this.replicaId);
 				neighbors.put(newReplicaId,true);
 				sendMessage(bMessage.getSrcId(), msg);
+				//System.out.println(this.processId+": Added "+bMessage.getReplicaId()+" to the neighbor list");
 			} else if(BayouMessageEnum.REQUEST.equals(bMessage.getMessageType())) {
 				//long clock = versionVector.get(this.replicaId);
 				versionVector.put(this.replicaId, System.currentTimeMillis());

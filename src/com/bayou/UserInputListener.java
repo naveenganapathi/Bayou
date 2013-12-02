@@ -2,6 +2,8 @@ package com.bayou;
 import java.util.List;
 import java.util.Scanner;
 
+import com.bayou.common.BayouMessage;
+import com.bayou.common.BayouMessageEnum;
 import com.bayou.common.UserRequest;
 import com.bayou.common.UserRequestEnum;
 public class UserInputListener extends Process {
@@ -35,23 +37,29 @@ public class UserInputListener extends Process {
 			r.setOperation(UserRequestEnum.RECOVER_CONNECTION);
 			r.setSrcId(arr[1]);
 			r.setDestId(arr[2]);
+		} else if (UserRequestEnum.JOIN.equals(UserRequestEnum.valueOf(arr[0]))) {
+			r.setOperation(UserRequestEnum.JOIN);
+			r.setSrcId(arr[1]);
+			r.setDestId(arr[2]);
 		}
 
 		// to include other stuff as and when necessary.
 		return r;
 	}
 
-	public void performUserRequest(UserRequest r) {
+	public void performUserRequest(UserRequest r) throws Exception {
 		switch(r.getOperation()) {
 			case BREAK_CONNECTION:
 				break;
 			case CONTINUE:
+				System.out.println("Continuing");
 				this.main.pause = false;
 				break;
 			case ISOLATE:				
 				alterNeighborStates(r.getSrcId(),false);
 				break;
 			case JOIN:
+				joinReplica(r.getSrcId(),r.getDestId());
 				break;
 			case LEAVE:
 				break;
@@ -67,6 +75,25 @@ public class UserInputListener extends Process {
 				break;
 			case RECOVER_CONNECTION:
 				break;			
+		}
+	}
+
+	private void joinReplica(String srcId, String destId) throws Exception {
+		if(!destId.equals("-1") && main.processes.get("REPLICA:"+destId)==null) {
+			System.err.println("MAIN: REPLICA:"+destId+" is not yet created");
+			return;
+		}
+		if(main.processes.get("REPLICA:"+srcId)==null) {
+			//System.out.println("creating replica - "+vals[0]);
+			Replica r = new Replica(this.main, "REPLICA:"+srcId, Integer.parseInt(destId));
+			//System.out.println("Created replica - "+vals[0]);
+			r.start();
+			//addProcess("REPLICA:"+vals[0],r);
+		} else {
+			BayouMessage msg = new BayouMessage();
+			msg.setMessageType(BayouMessageEnum.ADD_NEIGHBOR);
+			msg.setReplicaId(((Replica)main.processes.get("REPLICA:"+srcId)).replicaId);
+			main.sendMessage("UIL", "REPLICA:"+destId, msg);
 		}
 	}
 
@@ -101,7 +128,7 @@ public class UserInputListener extends Process {
 		}
 	}
 	
-	public void body() {
+	public void body() throws Exception {
 		Scanner reader = new Scanner(System.in);
 		while(true) {
 			String input = reader.nextLine();
