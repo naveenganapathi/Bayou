@@ -32,8 +32,8 @@ public class Replica extends Process {
 			
 			//move writes from tentative to commited if primary.
 			if(isPrimary) {
-				commitTentativeWrites();
-				System.out.println("comitted :"+commitedWrites.size()+" writes!");
+				//commitTentativeWrites();
+				//System.out.println("comitted :"+commitedWrites.size()+" writes!");
 			}			
 			System.out.println(processId+": Initiating Entropy for "+neighbors.size()+ " processes.");
 			for(Entry<List<Long>,Boolean> neighborEntry : neighbors.entrySet()) {
@@ -204,12 +204,24 @@ public class Replica extends Process {
 				msg.setReplicaId(replicaId);
 				sendMessage(bMessage.getSrcId(),msg);
 			} else if(BayouMessageEnum.ENTROPY_ADD_WRITES.equals(bMessage.getMessageType())) {
-				System.out.println(this.processId+": Entropy Writes Received");
+				System.out.println(this.processId+": commit Writes Received:"+bMessage.getCommitMessages().size());				
+				if(this.processId.equals("REPLICA:1")) {
+					System.err.println("versionvector:\n"+versionVector);
+					System.err.println(this.processId+" current tentative write size:"+tentativeWrites.size()+",no of tentative writes received:"+bMessage.getTentativeMessages().size());
+				} else {
+					System.out.println(this.processId+" current tentative write size:"+tentativeWrites.size()+",no of tentative writes received:"+bMessage.getTentativeMessages().size());
+				}
+				
 				synchronized(this) {
 				updateCommittedWrites(bMessage.getCommitMessages());
 				//deleteCommitted(bMessage.getTentativeMessages());
 				updateTentativeWrites(bMessage.getTentativeMessages());
 				}
+				if(this.processId.equals("REPLICA:1")) {
+					System.err.println(this.processId+" new tentative write size:"+tentativeWrites.size());
+				} else {
+					System.out.println(this.processId+" new tentative write size:"+tentativeWrites.size());					
+				}				
 			}
 		}
 	}
@@ -261,6 +273,7 @@ public class Replica extends Process {
 					(tentativeWrites.get(i).getRequest().getAcceptStamp() == toInclude.get(j).getRequest().getAcceptStamp())
 			&&(tentativeWrites.get(i).getReplicaId().equals(toInclude.get(j).getReplicaId()) )
 			){
+				System.err.println("same values found:");
 			  res.add(toInclude.get(j));
 			  i++;
 			  j++;
@@ -290,6 +303,14 @@ public class Replica extends Process {
 			j++;
 		}
 	    tentativeWrites = res;
+	    
+//	    for(BayouMessage msg : tentativeWrites) {
+//	    	if(versionVector.get(msg.getReplicaId()) == null ||
+//	    			versionVector.get(msg.getReplicaId()) < msg.getRequest().getAcceptStamp() ) {
+//	    		versionVector.put(msg.getReplicaId(), msg.getRequest().getAcceptStamp());
+//	    	}
+//	    }
+	    
 	    System.out.println(this.processId+"New Tentative Writes:");
 		for(BayouMessage msg : tentativeWrites) {
 			System.out.println(msg);
