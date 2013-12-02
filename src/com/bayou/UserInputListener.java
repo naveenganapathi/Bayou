@@ -41,6 +41,9 @@ public class UserInputListener extends Process {
 			r.setOperation(UserRequestEnum.JOIN);
 			r.setSrcId(arr[1]);
 			r.setDestId(arr[2]);
+		} else if (UserRequestEnum.LEAVE.equals(UserRequestEnum.valueOf(arr[0]))) {
+			r.setOperation(UserRequestEnum.LEAVE);
+			r.setSrcId(arr[1]);
 		}
 
 		// to include other stuff as and when necessary.
@@ -62,6 +65,7 @@ public class UserInputListener extends Process {
 				joinReplica(r.getSrcId(),r.getDestId());
 				break;
 			case LEAVE:
+				retire(r.getSrcId());
 				break;
 			case PAUSE:
 				this.main.pause = true;
@@ -76,6 +80,10 @@ public class UserInputListener extends Process {
 			case RECOVER_CONNECTION:
 				break;			
 		}
+	}
+
+	private void retire(String srcId) {
+				
 	}
 
 	private void joinReplica(String srcId, String destId) throws Exception {

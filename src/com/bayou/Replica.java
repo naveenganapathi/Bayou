@@ -161,7 +161,8 @@ public class Replica extends Process {
 				//System.out.println(this.processId+": Added "+bMessage.getReplicaId()+" to the neighbor list. Message - "+bMessage);
 			} else if(BayouMessageEnum.CREATE_WRITE.equals(bMessage.getMessageType())) {
 				List<Long> newReplicaId = new ArrayList<Long>();
-				newReplicaId.add(System.currentTimeMillis());
+				long acceptStamp = System.currentTimeMillis();
+				newReplicaId.add(acceptStamp);
 				newReplicaId.addAll(this.replicaId);
 				BayouMessage msg = new BayouMessage();
 				msg.setMessageType(BayouMessageEnum.CREATE_WRITE_RESP);
@@ -169,6 +170,11 @@ public class Replica extends Process {
 				msg.setParentReplicaId(this.replicaId);
 				neighbors.put(newReplicaId,true);
 				sendMessage(bMessage.getSrcId(), msg);
+				// new
+				//versionVector.put(newReplicaId, acceptStamp);
+				bMessage.getRequest().setAcceptStamp(acceptStamp);
+				bMessage.setReplicaId(newReplicaId);
+				tentativeWrites.add(bMessage);
 				//System.out.println(this.processId+": Added "+bMessage.getReplicaId()+" to the neighbor list");
 			} else if(BayouMessageEnum.REQUEST.equals(bMessage.getMessageType())) {
 				//long clock = versionVector.get(this.replicaId);
@@ -222,6 +228,7 @@ public class Replica extends Process {
 						updateCommittedWrites(bMessage.getCommitMessages());
 						//deleteCommitted(bMessage.getTentativeMessages());
 						updateTentativeWrites(bMessage.getTentativeMessages());
+						performWrites();
 					}
 				}
 				if(this.processId.equals("REPLICA:1")) {
@@ -329,19 +336,20 @@ public class Replica extends Process {
 		}
 
 		writeListToLog(tentativeWrites, "TENTATIVE");
-		performWrites();
 	}
 
 	private synchronized void performWrites() {
 		playList.clear();
+		executeRequest(commitedWrites);
 		executeRequest(tentativeWrites);
 	}
+	
 	private void executeRequest(BayouRequest request) {
 		if(BayouRequestEnum.ADD.equals(request.getOperation())) {
 			playList.put(request.getKey(), request.getValue());
 		} else if(BayouRequestEnum.EDIT.equals(request.getOperation())) {
 			playList.put(request.getKey(), request.getValue());
-		} else {
+		} else if(BayouRequestEnum.DELETE.equals(request.getOperation())){
 			playList.remove(request.getKey());
 		}
 	}
