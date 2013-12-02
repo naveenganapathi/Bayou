@@ -19,7 +19,7 @@ import com.bayou.common.BayouRequestEnum;
 public class Replica extends Process {
 
 	private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
-	
+
 	boolean isPrimary = false;
 	List<Long> replicaId = new ArrayList<Long>();
 	Map<List<Long>,Long> versionVector =  new HashMap<List<Long>,Long>();
@@ -31,10 +31,10 @@ public class Replica extends Process {
 
 	Runnable startEntropy = new Runnable() {
 		public void run() { 
-			
+
 			//move writes from tentative to commited if primary.
 			if(isPrimary) {
-				//commitTentativeWrites();
+				commitTentativeWrites();
 				//System.out.println("comitted :"+commitedWrites.size()+" writes!");
 			}			
 			System.out.println(processId+": Initiating Entropy for "+neighbors.size()+ " processes.");
@@ -59,19 +59,21 @@ public class Replica extends Process {
 			}
 		}
 	};
-	
+
 	public  void commitTentativeWrites() {
 		synchronized(tentativeWrites) {
-			for(BayouMessage m : tentativeWrites) {
-				commitedWrites.add(m);
-				CSN++;
-				m.setCSN(CSN);				
+			synchronized(commitedWrites) {
+				for(BayouMessage m : tentativeWrites) {
+					commitedWrites.add(m);
+					CSN++;
+					m.setCSN(CSN);				
+				}
+				tentativeWrites.clear();
 			}
-			tentativeWrites.clear();
 		}
 	}
 
-	
+
 	@Override
 	public boolean canSend(String pid) {
 		Process p = main.processes.get(pid);
@@ -83,7 +85,7 @@ public class Replica extends Process {
 		}
 		return true;
 	}
-	
+
 	public Replica(Main env, String procId, int addUnder) throws Exception {
 		this.main = env;
 		this.processId = procId;
@@ -92,7 +94,7 @@ public class Replica extends Process {
 		if(addUnder==-1) { 
 			replicaId.add(System.currentTimeMillis());
 			this.isPrimary = true;
-			this.versionVector.put(this.replicaId, 0L);
+			this.versionVector.put(this.replicaId, System.currentTimeMillis());
 			main.processMap.put(replicaId, processId);
 			//System.out.println("Primary Created with ID - "+replicaId);
 		}
@@ -136,29 +138,33 @@ public class Replica extends Process {
 		boolean isCreated = false;
 		BayouMessage toRemove = null;
 		while(!isCreated && !isPrimary) {
-			List<BayouMessage> msgs = new ArrayList<BayouMessage>(messages.list);
-			for(BayouMessage mesg : msgs) {
-				if(BayouMessageEnum.CREATE_WRITE_RESP.equals(mesg.getMessageType())) {
-					this.replicaId = mesg.getReplicaId();
-					this.neighbors.put(mesg.getParentReplicaId(),true);
-					this.versionVector.put(this.replicaId, 0L);
-					main.processMap.put(replicaId, processId);
-					toRemove = mesg;
-					isCreated = true;
-					break;
+			if(!messages.list.isEmpty()) {
+				List<BayouMessage> msgs = new ArrayList<BayouMessage>(messages.list);
+				for(BayouMessage mesg : msgs) {
+					if(BayouMessageEnum.CREATE_WRITE_RESP.equals(mesg.getMessageType())) {
+						this.replicaId = mesg.getReplicaId();
+						this.neighbors.put(mesg.getParentReplicaId(),true);
+						this.versionVector.put(this.replicaId, System.currentTimeMillis());
+						main.processMap.put(replicaId, processId);
+						toRemove = mesg;
+						isCreated = true;
+						break;
+					}
 				}
 			}
 			Thread.sleep(100);
 		}
 		messages.list.remove(toRemove);
-		
+
 		while(true) {
 			BayouMessage bMessage = getNextMessage();
 			if(BayouMessageEnum.ADD_NEIGHBOR.equals(bMessage.getMessageType())) {				
 				neighbors.put(bMessage.getReplicaId(),true);
+				//System.out.println(this.processId+": Added "+bMessage.getReplicaId()+" to the neighbor list. Message - "+bMessage);
 			} else if(BayouMessageEnum.CREATE_WRITE.equals(bMessage.getMessageType())) {
 				List<Long> newReplicaId = new ArrayList<Long>();
-				newReplicaId.add(System.currentTimeMillis());
+				long acceptStamp = System.currentTimeMillis();
+				newReplicaId.add(acceptStamp);
 				newReplicaId.addAll(this.replicaId);
 				BayouMessage msg = new BayouMessage();
 				msg.setMessageType(BayouMessageEnum.CREATE_WRITE_RESP);
@@ -166,9 +172,15 @@ public class Replica extends Process {
 				msg.setParentReplicaId(this.replicaId);
 				neighbors.put(newReplicaId,true);
 				sendMessage(bMessage.getSrcId(), msg);
+				// new
+				//versionVector.put(newReplicaId, acceptStamp);
+				bMessage.getRequest().setAcceptStamp(acceptStamp);
+				bMessage.setReplicaId(newReplicaId);
+				tentativeWrites.add(bMessage);
+				//System.out.println(this.processId+": Added "+bMessage.getReplicaId()+" to the neighbor list");
 			} else if(BayouMessageEnum.REQUEST.equals(bMessage.getMessageType())) {
-				long clock = versionVector.get(this.replicaId);
-				versionVector.put(this.replicaId, clock+1);
+				//long clock = versionVector.get(this.replicaId);
+				versionVector.put(this.replicaId, System.currentTimeMillis());
 				bMessage.getRequest().setAcceptStamp(versionVector.get(this.replicaId));
 				bMessage.setReplicaId(replicaId);
 				tentativeWrites.add(bMessage);
@@ -213,17 +225,16 @@ public class Replica extends Process {
 				} else {
 					System.out.println(this.processId+" current tentative write size:"+tentativeWrites.size()+",no of tentative writes received:"+bMessage.getTentativeMessages().size());
 				}
-				
+
 				synchronized(tentativeWrites) {
-				updateCommittedWrites(bMessage.getCommitMessages());
-				//deleteCommitted(bMessage.getTentativeMessages());
-				updateTentativeWrites(bMessage.getTentativeMessages());
+					synchronized(commitedWrites) {
+						updateCommittedWrites(bMessage.getCommitMessages());
+						//deleteCommitted(bMessage.getTentativeMessages());
+						updateTentativeWrites(bMessage.getTentativeMessages());
+						performWrites();
+					}
 				}
-				if(this.processId.equals("REPLICA:1")) {
-					System.err.println(this.processId+" new tentative write size:"+tentativeWrites.size());
-				} else {
-					System.out.println(this.processId+" new tentative write size:"+tentativeWrites.size());					
-				}				
+					
 			}
 		}
 	}
@@ -241,7 +252,7 @@ public class Replica extends Process {
 		writeListToLog(commitedWrites, "COMMIT");
 		System.out.println(this.processId+" committed"+commitedWrites.size()+" writes");
 	}
-	
+
 	private synchronized void deleteFromList(List<BayouMessage> tentative, BayouMessage m) {
 		List<BayouMessage> toRemove = new ArrayList<BayouMessage>();
 		for(BayouMessage msg : tentative) {
@@ -254,8 +265,8 @@ public class Replica extends Process {
 			tentative.remove(msg);
 		}
 	}
-	
-	private synchronized void updateTentativeWrites(List<BayouMessage> toInclude) throws Exception {
+
+	private synchronized void updateTentativeWrites(List<BayouMessage> toInclude) {
 		List<BayouMessage> res = new ArrayList<BayouMessage>();
 		List<BayouMessage> old = new ArrayList<BayouMessage>(tentativeWrites);
 		int s1,s2,i,j;
@@ -271,16 +282,16 @@ public class Replica extends Process {
 		}
 		s1 = tentativeWrites.size(); s2 = toInclude.size();
 		while(i<s1 && j < s2) {
-			
+			//System.err.println("MY TS - "+tentativeWrites.get(i).getRequest().getAcceptStamp()+"; NEW MSG TS - "+toInclude.get(j).getRequest().getAcceptStamp());
 			//data already present.
 			if(
 					(tentativeWrites.get(i).getRequest().getAcceptStamp() == toInclude.get(j).getRequest().getAcceptStamp())
-			&&(tentativeWrites.get(i).getReplicaId().equals(toInclude.get(j).getReplicaId()) )
-			){
+					&&(tentativeWrites.get(i).getReplicaId().equals(toInclude.get(j).getReplicaId()) )
+					){
 				System.err.println("same values found:");
-			  res.add(toInclude.get(j));
-			  i++;
-			  j++;
+				res.add(toInclude.get(j));
+				i++;
+				j++;
 			} else if (tentativeWrites.get(i).getRequest().getAcceptStamp() < toInclude.get(j).getRequest().getAcceptStamp()) {
 				res.add(tentativeWrites.get(i));
 				i++;
@@ -298,7 +309,7 @@ public class Replica extends Process {
 			}
 			writeToLog(this.processId+"tempTent1:i,j"+i+","+j+","+res);
 		}
-		
+
 		while(i < s1) {
 			res.add(tentativeWrites.get(i));
 			i++;
@@ -310,49 +321,39 @@ public class Replica extends Process {
 			writeToLog(this.processId+"tempTent3:i,j"+i+","+j+","+res);
 		}
 	    tentativeWrites = res;
-	    Set<BayouMessage> test = new HashSet<BayouMessage>();
-	    for(BayouMessage m : tentativeWrites) {
-	    	test.add(m);
-	    }
-	    
-	    writeToLog(this.processId+"New Tentative Writes:");
+
 		for(BayouMessage msg : tentativeWrites) {
-			writeToLog(msg.toString());
+			if(versionVector.get(msg.getReplicaId()) == null ||
+					versionVector.get(msg.getReplicaId()) < msg.getRequest().getAcceptStamp() ) {
+				versionVector.put(msg.getReplicaId(), msg.getRequest().getAcceptStamp());
+			}
 		}
-		
-	    if(test.size() < res.size()) {
-	    	System.err.println(this.processId+"error");
-	    	System.out.println("old"+old+"\n,added    "+toInclude+"\n,new   "+tentativeWrites);
-	    	main.pause = true;
-	    	//throw new Exception("error");
- }
-//	    for(BayouMessage msg : tentativeWrites) {
-//	    	if(versionVector.get(msg.getReplicaId()) == null ||
-//	    			versionVector.get(msg.getReplicaId()) < msg.getRequest().getAcceptStamp() ) {
-//	    		versionVector.put(msg.getReplicaId(), msg.getRequest().getAcceptStamp());
-//	    	}
-//	    }
-	    
+
+		System.out.println(this.processId+"New Tentative Writes:");
+		for(BayouMessage msg : tentativeWrites) {
+			System.out.println(msg);
+		}
 
 		//delete msgs from tentative writes that were already committed
 		for(BayouMessage m : commitedWrites) {
 			deleteFromList(tentativeWrites, m);
 		}
-		
+
 		writeListToLog(tentativeWrites, "TENTATIVE");
-	    performWrites();
 	}
-	
+
 	private synchronized void performWrites() {
 		playList.clear();
+		executeRequest(commitedWrites);
 		executeRequest(tentativeWrites);
 	}
+	
 	private void executeRequest(BayouRequest request) {
 		if(BayouRequestEnum.ADD.equals(request.getOperation())) {
 			playList.put(request.getKey(), request.getValue());
 		} else if(BayouRequestEnum.EDIT.equals(request.getOperation())) {
 			playList.put(request.getKey(), request.getValue());
-		} else {
+		} else if(BayouRequestEnum.DELETE.equals(request.getOperation())){
 			playList.remove(request.getKey());
 		}
 	}
