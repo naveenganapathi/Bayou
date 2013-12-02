@@ -2,9 +2,11 @@ package com.bayou;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -212,7 +214,7 @@ public class Replica extends Process {
 					System.out.println(this.processId+" current tentative write size:"+tentativeWrites.size()+",no of tentative writes received:"+bMessage.getTentativeMessages().size());
 				}
 				
-				synchronized(this) {
+				synchronized(tentativeWrites) {
 				updateCommittedWrites(bMessage.getCommitMessages());
 				//deleteCommitted(bMessage.getTentativeMessages());
 				updateTentativeWrites(bMessage.getTentativeMessages());
@@ -253,19 +255,21 @@ public class Replica extends Process {
 		}
 	}
 	
-	private synchronized void updateTentativeWrites(List<BayouMessage> toInclude) {
+	private synchronized void updateTentativeWrites(List<BayouMessage> toInclude) throws Exception {
 		List<BayouMessage> res = new ArrayList<BayouMessage>();
+		List<BayouMessage> old = new ArrayList<BayouMessage>(tentativeWrites);
 		int s1,s2,i,j;
-		i=j=0;
-		s1 = tentativeWrites.size(); s2 = toInclude.size();
-		System.out.println(this.processId+"Old Tentative Writes:");
+		i=j=0;		
+		writeToLog(this.processId+"Old Tentative Writes:");
 		for(BayouMessage msg : tentativeWrites) {
-			System.out.println(msg);
+			toInclude.remove(msg);
+			writeToLog(msg.toString());
 		}
-		System.out.println(this.processId+"Writes Received:");
+		writeToLog(this.processId+"Writes Received:");
 		for(BayouMessage msg : toInclude) {
-			System.out.println(msg);
+			writeToLog(msg.toString());
 		}
+		s1 = tentativeWrites.size(); s2 = toInclude.size();
 		while(i<s1 && j < s2) {
 			
 			//data already present.
@@ -292,18 +296,36 @@ public class Replica extends Process {
 					i++;
 				}
 			}
+			writeToLog(this.processId+"tempTent1:i,j"+i+","+j+","+res);
 		}
 		
 		while(i < s1) {
 			res.add(tentativeWrites.get(i));
 			i++;
+			writeToLog(this.processId+"tempTent2:i,j"+i+","+j+","+res);
 		}
 		while(j < s2) {
 			res.add(toInclude.get(j));
 			j++;
+			writeToLog(this.processId+"tempTent3:i,j"+i+","+j+","+res);
 		}
 	    tentativeWrites = res;
+	    Set<BayouMessage> test = new HashSet<BayouMessage>();
+	    for(BayouMessage m : tentativeWrites) {
+	    	test.add(m);
+	    }
 	    
+	    writeToLog(this.processId+"New Tentative Writes:");
+		for(BayouMessage msg : tentativeWrites) {
+			writeToLog(msg.toString());
+		}
+		
+	    if(test.size() < res.size()) {
+	    	System.err.println(this.processId+"error");
+	    	System.out.println("old"+old+"\n,added    "+toInclude+"\n,new   "+tentativeWrites);
+	    	main.pause = true;
+	    	//throw new Exception("error");
+ }
 //	    for(BayouMessage msg : tentativeWrites) {
 //	    	if(versionVector.get(msg.getReplicaId()) == null ||
 //	    			versionVector.get(msg.getReplicaId()) < msg.getRequest().getAcceptStamp() ) {
@@ -311,11 +333,7 @@ public class Replica extends Process {
 //	    	}
 //	    }
 	    
-	    System.out.println(this.processId+"New Tentative Writes:");
-		for(BayouMessage msg : tentativeWrites) {
-			System.out.println(msg);
-		}
-		
+
 		//delete msgs from tentative writes that were already committed
 		for(BayouMessage m : commitedWrites) {
 			deleteFromList(tentativeWrites, m);
