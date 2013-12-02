@@ -35,9 +35,10 @@ public class Replica extends Process {
 				commitTentativeWrites();
 				System.out.println("comitted :"+commitedWrites.size()+" writes!");
 			}			
-			System.out.println(processId+": Initiating Entropy");
+			System.out.println(processId+": Initiating Entropy for "+neighbors.size()+ " processes.");
 			for(Entry<List<Long>,Boolean> neighborEntry : neighbors.entrySet()) {
 				if(neighborEntry.getValue() == false) {
+					System.out.println("value set to false;");
 					continue;
 				}			
 				List<Long> neighbor = neighborEntry.getKey();
@@ -74,7 +75,7 @@ public class Replica extends Process {
 		Process p = main.processes.get(pid);
 		if(p instanceof Replica) {
 			Replica r = (Replica) p;
-			if(neighbors.get(r.replicaId) == null ||
+			if(neighbors.get(r.replicaId) != null &&
 					neighbors.get(r.replicaId) == false)
 				return false;
 		}
@@ -133,7 +134,8 @@ public class Replica extends Process {
 		boolean isCreated = false;
 		BayouMessage toRemove = null;
 		while(!isCreated && !isPrimary) {
-			for(BayouMessage mesg : messages.list) {
+			List<BayouMessage> msgs = new ArrayList<BayouMessage>(messages.list);
+			for(BayouMessage mesg : msgs) {
 				if(BayouMessageEnum.CREATE_WRITE_RESP.equals(mesg.getMessageType())) {
 					this.replicaId = mesg.getReplicaId();
 					this.neighbors.put(mesg.getParentReplicaId(),true);
@@ -150,7 +152,7 @@ public class Replica extends Process {
 		
 		while(true) {
 			BayouMessage bMessage = getNextMessage();
-			if(BayouMessageEnum.ADD_NEIGHBOR.equals(bMessage.getMessageType())) {
+			if(BayouMessageEnum.ADD_NEIGHBOR.equals(bMessage.getMessageType())) {				
 				neighbors.put(bMessage.getReplicaId(),true);
 			} else if(BayouMessageEnum.CREATE_WRITE.equals(bMessage.getMessageType())) {
 				List<Long> newReplicaId = new ArrayList<Long>();

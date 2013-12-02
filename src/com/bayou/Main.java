@@ -21,12 +21,15 @@ public class Main {
 		msg.setSrcId(srcProcessId);
 		Process p = processes.get(destProcessId);
 		Process s = processes.get(srcProcessId);
-		System.out.println(srcProcessId+" "+destProcessId+" "+(s==null)+" "+msg.getMessageType());
-		System.out.println("msg"+msg);
+	//	System.out.println(srcProcessId+" "+destProcessId+" "+(s==null)+" "+msg.getMessageType());
+	//	System.out.println("msg"+msg);
 		if(srcProcessId.equals("MAIN") || s.canSend(destProcessId)) {
 		if(p!=null) {
+			//System.out.println("delivering"+msg+" to "+destProcessId);
 			p.deliver(msg);
 		}
+		} else {
+			System.out.println("sending to"+destProcessId+" failed for "+msg);
 		}
 	}
 
@@ -38,6 +41,7 @@ public class Main {
 		System.out.println("Adding process - "+processId);
 		processes.put(processId,process);
 		process.start();
+		//System.out.println("started process");
 	}
 
 	synchronized public void removeProcess(String processId) {
@@ -55,6 +59,7 @@ public class Main {
 				System.out.println("creating replica - "+vals[0]);
 				Replica r = new Replica(this, "REPLICA:"+vals[0], Integer.parseInt(vals[1]));
 				System.out.println("Created replica - "+vals[0]);
+				r.start();
 				//addProcess("REPLICA:"+vals[0],r);
 			} else {
 				BayouMessage msg = new BayouMessage();

@@ -13,7 +13,7 @@ public abstract class Process extends Thread{
 	public PrintWriter writer;
 
 	public void run(){
-		try {
+		try {			
 			body();
 		} catch (Exception e) {
 			writeToLog(this.processId+" caught exception. finishing execution."+e);
