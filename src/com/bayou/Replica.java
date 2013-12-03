@@ -70,6 +70,8 @@ public class Replica extends Process {
 					m.setCSN(CSN);				
 				}
 				tentativeWrites.clear();
+				writeListToLog(commitedWrites, "COMMIT");
+				writeListToLog(tentativeWrites, "TENTATIVE");
 			}
 		}
 	}
