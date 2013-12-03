@@ -21,8 +21,9 @@ public class Main {
 		msg.setSrcId(srcProcessId);
 		Process p = processes.get(destProcessId);
 		Process s = processes.get(srcProcessId);
-	//	System.out.println(srcProcessId+" "+destProcessId+" "+(s==null)+" "+msg.getMessageType());
-	//	System.out.println("msg"+msg);
+		System.out.println(srcProcessId+" "+destProcessId+" "+(s==null)+" "+msg.getMessageType());
+		System.out.println("msg"+msg);
+		System.out.println("Source ID for you"+srcProcessId);
 		if(srcProcessId.equals("MAIN") || s.canSend(destProcessId)) {
 		if(p!=null) {
 			//System.out.println("delivering"+msg+" to "+destProcessId);
@@ -62,10 +63,25 @@ public class Main {
 				r.start();
 				//addProcess("REPLICA:"+vals[0],r);
 			} else {
-				BayouMessage msg = new BayouMessage();
-				msg.setMessageType(BayouMessageEnum.ADD_NEIGHBOR);
-				msg.setReplicaId(((Replica)processes.get("REPLICA:"+vals[0])).replicaId);
-				sendMessage("MAIN", "REPLICA:"+vals[1], msg);
+				
+				Thread.sleep(1000);
+				Replica r0 = (Replica)processes.get("REPLICA:"+vals[0]);
+				Replica r1 = (Replica)processes.get("REPLICA:"+vals[1]);
+				r0.neighbors.put(r1.replicaId, true);
+				r1.neighbors.put(r0.replicaId, true);
+				
+//				BayouMessage msg = new BayouMessage();
+//				msg.setMessageType(BayouMessageEnum.ADD_NEIGHBOR);
+//				msg.setReplicaId(((Replica)processes.get("REPLICA:"+vals[0])).replicaId);
+//				sendMessage("MAIN", "REPLICA:"+vals[1], msg);
+//				
+//			    msg = new BayouMessage();
+//				msg.setMessageType(BayouMessageEnum.ADD_NEIGHBOR);
+//				msg.setReplicaId(((Replica)processes.get("REPLICA:"+vals[1])).replicaId);
+//				System.out.println("Processes list - "+processes);
+//				System.out.println("REPLICA:"+vals[0]+"adding neighbour replica id set as"+((Replica)processes.get("REPLICA:"+vals[1])).replicaId);
+//				sendMessage("MAIN", "REPLICA:"+vals[0], msg);
+				
 			}
 			Thread.sleep(2);
 		}

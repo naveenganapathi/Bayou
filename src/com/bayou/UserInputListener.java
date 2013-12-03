@@ -53,6 +53,7 @@ public class UserInputListener extends Process {
 	public void performUserRequest(UserRequest r) throws Exception {
 		switch(r.getOperation()) {
 			case BREAK_CONNECTION:
+				changeConnectionState(r.getSrcId(),r.getDestId(),false);
 				break;
 			case CONTINUE:
 				System.out.println("Continuing");
@@ -78,12 +79,13 @@ public class UserInputListener extends Process {
 				alterNeighborStates(r.getSrcId(), true);
 				break;
 			case RECOVER_CONNECTION:
+				changeConnectionState(r.getSrcId(),r.getDestId(),true);
 				break;			
 		}
 	}
 
 	private void retire(String srcId) {
-				
+		((Replica)this.main.processes.get(srcId)).isRetired=true;
 	}
 
 	private void joinReplica(String srcId, String destId) throws Exception {
@@ -98,10 +100,10 @@ public class UserInputListener extends Process {
 			r.start();
 			//addProcess("REPLICA:"+vals[0],r);
 		} else {
-			BayouMessage msg = new BayouMessage();
-			msg.setMessageType(BayouMessageEnum.ADD_NEIGHBOR);
-			msg.setReplicaId(((Replica)main.processes.get("REPLICA:"+srcId)).replicaId);
-			main.sendMessage("UIL", "REPLICA:"+destId, msg);
+			Replica r0 = (Replica)main.processes.get("REPLICA:"+srcId);
+			Replica r1 = (Replica)main.processes.get("REPLICA:"+destId);
+			r0.neighbors.put(r1.replicaId, true);
+			r1.neighbors.put(r0.replicaId, true);
 		}
 	}
 

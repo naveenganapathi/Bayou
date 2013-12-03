@@ -12,6 +12,7 @@ public class BayouMessage {
 	List<Long> parentReplicaId;
 	Map<List<Long>,Long> versionVector;
 	BayouRequest request;
+	boolean becomePrimary = false;
 	List<BayouMessage> tentativeMessages;
 	List<BayouMessage> commitMessages;
 
@@ -95,5 +96,13 @@ public class BayouMessage {
 
 	public void setCommitMessages(List<BayouMessage> commitMessages) {
 		this.commitMessages = commitMessages;
+	}
+
+	public boolean isBecomePrimary() {
+		return becomePrimary;
+	}
+
+	public void setBecomePrimary(boolean becomePrimary) {
+		this.becomePrimary = becomePrimary;
 	}
 }

@@ -12,6 +12,9 @@ public class BayouRequest {
 		this.value = value;
 		this.clientCommandId = clientCommandId;
 	}
+	public BayouRequest() {
+		// TODO Auto-generated constructor stub
+	}
 	public BayouRequestEnum getOperation() {
 		return operation;
 	}

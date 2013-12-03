@@ -2,11 +2,9 @@ package com.bayou;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -19,7 +17,7 @@ import com.bayou.common.BayouRequestEnum;
 public class Replica extends Process {
 
 	private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
-
+	public boolean isRetired = false;
 	boolean isPrimary = false;
 	List<Long> replicaId = new ArrayList<Long>();
 	Map<List<Long>,Long> versionVector =  new HashMap<List<Long>,Long>();
@@ -31,30 +29,32 @@ public class Replica extends Process {
 
 	Runnable startEntropy = new Runnable() {
 		public void run() { 
-
-			//move writes from tentative to commited if primary.
-			if(isPrimary) {
-				commitTentativeWrites();
-				//System.out.println("comitted :"+commitedWrites.size()+" writes!");
-			}			
-			System.out.println(processId+": Initiating Entropy for "+neighbors.size()+ " processes.");
-			for(Entry<List<Long>,Boolean> neighborEntry : neighbors.entrySet()) {
-				if(neighborEntry.getValue() == false) {
-					System.out.println("value set to false;");
-					continue;
+			if(!isRetired) {
+				//move writes from tentative to commited if primary.
+				if(isPrimary) {
+					
+					commitTentativeWrites();
+					//System.out.println("comitted :"+commitedWrites.size()+" writes!");
 				}			
-				List<Long> neighbor = neighborEntry.getKey();
-				BayouMessage msg = new BayouMessage();
-				System.out.println(processId+" sending init entropy to :"+main.processMap.get(neighbor));
-				msg.setReplicaId(replicaId);
-				msg.setMessageType(BayouMessageEnum.INIT_ENTROPY);
-				try {
-					System.out.println("sending msg");
-					sendMessage(main.processMap.get(neighbor), msg);
-					System.out.println("returning from send msg");
-				} catch (Exception e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
+				System.out.println(processId+": Initiating Entropy for "+neighbors.size()+ " processes.");
+				for(Entry<List<Long>,Boolean> neighborEntry : neighbors.entrySet()) {
+					if(neighborEntry.getValue() == false) {
+						System.out.println("value set to false;");
+						continue;
+					}			
+					List<Long> neighbor = neighborEntry.getKey();
+					BayouMessage msg = new BayouMessage();
+					System.out.println(processId+" sending init entropy to :"+main.processMap.get(neighbor));
+					msg.setReplicaId(replicaId);
+					msg.setMessageType(BayouMessageEnum.INIT_ENTROPY);
+					try {
+						System.out.println("sending msg");
+						sendMessage(main.processMap.get(neighbor), msg);
+						System.out.println("returning from send msg");
+					} catch (Exception e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
 				}
 			}
 		}
@@ -63,6 +63,7 @@ public class Replica extends Process {
 	public  void commitTentativeWrites() {
 		synchronized(tentativeWrites) {
 			synchronized(commitedWrites) {
+				System.out.println("committing tentative writes of size"+tentativeWrites.size());
 				for(BayouMessage m : tentativeWrites) {
 					commitedWrites.add(m);
 					CSN++;
@@ -109,9 +110,15 @@ public class Replica extends Process {
 		StringBuffer br = new StringBuffer();
 		br.append(this.replicaId+"\n");
 		for(BayouMessage bm : bmList) {
-			String s =bm.getReplicaId()+","+bm.getRequest().getAcceptStamp()+":"+bm.getRequest().getOperation()
-					+","+bm.getRequest().getKey()
-					+","+bm.getRequest().getValue();			
+			String s = null;
+			if(bm.getRequest().getOperation() != null) {
+				s =bm.getReplicaId()+","+bm.getRequest().getAcceptStamp()+":"+bm.getRequest().getOperation()
+						+","+bm.getRequest().getKey()
+						+","+bm.getRequest().getValue();
+			} else {
+				s =bm.getReplicaId()+","+bm.getRequest().getAcceptStamp()+":"+
+						bm.getMessageType();
+			}						
 			br.append(s+"\n");
 		}		
 		clearAndWriteFile(br.toString(), ext);
@@ -133,6 +140,28 @@ public class Replica extends Process {
 		return true;
 	}
 
+	boolean hasReceiverRetired(BayouMessage bMessage,List<Long> key) {
+		List<Long> parent = key.subList(1, key.size());
+		List<Long> oldParent;
+		int cnt = 0;
+		while(parent.size() > 0) {
+			if(bMessage.getVersionVector().get(parent) == null) {
+				cnt++;
+			} else {
+				if(bMessage.getVersionVector().get(parent) < key.get(0)) {
+					return false;
+				} else {
+					return true;
+				}
+			}
+			oldParent = parent;
+			if(1+cnt >= key.size())
+				return false;
+			parent = key.subList(1+cnt, key.size());
+			key = oldParent;
+		}
+		return false;
+	}
 	@Override
 	public void body() throws Exception {
 		boolean isCreated = false;
@@ -156,11 +185,10 @@ public class Replica extends Process {
 		}
 		messages.list.remove(toRemove);
 
-		while(true) {
+		while(!isRetired) {
 			BayouMessage bMessage = getNextMessage();
 			if(BayouMessageEnum.ADD_NEIGHBOR.equals(bMessage.getMessageType())) {				
 				neighbors.put(bMessage.getReplicaId(),true);
-				//System.out.println(this.processId+": Added "+bMessage.getReplicaId()+" to the neighbor list. Message - "+bMessage);
 			} else if(BayouMessageEnum.CREATE_WRITE.equals(bMessage.getMessageType())) {
 				List<Long> newReplicaId = new ArrayList<Long>();
 				long acceptStamp = System.currentTimeMillis();
@@ -173,7 +201,8 @@ public class Replica extends Process {
 				neighbors.put(newReplicaId,true);
 				sendMessage(bMessage.getSrcId(), msg);
 				// new
-				//versionVector.put(newReplicaId, acceptStamp);
+				versionVector.put(newReplicaId, acceptStamp);
+				bMessage.setRequest(new BayouRequest());
 				bMessage.getRequest().setAcceptStamp(acceptStamp);
 				bMessage.setReplicaId(newReplicaId);
 				tentativeWrites.add(bMessage);
@@ -184,6 +213,8 @@ public class Replica extends Process {
 				bMessage.getRequest().setAcceptStamp(versionVector.get(this.replicaId));
 				bMessage.setReplicaId(replicaId);
 				tentativeWrites.add(bMessage);
+				writeListToLog(tentativeWrites, "TENTATIVE");
+				performWrites();
 				executeRequest(bMessage.getRequest());
 				System.out.println(this.processId+"Tentative List:");
 				for(BayouMessage mesg: tentativeWrites) {
@@ -199,14 +230,28 @@ public class Replica extends Process {
 			} else if(BayouMessageEnum.INIT_ENTROPY_RESP.equals(bMessage.getMessageType())) {
 				System.out.println(this.processId+": Init Entropy Response Received");
 				List<BayouMessage> tentative = new ArrayList<BayouMessage>();
-				List<BayouMessage> toCommit = new ArrayList<BayouMessage>();
+				List<BayouMessage> toCommit = new ArrayList<BayouMessage>();				
 				if(CSN > bMessage.getCSN()) {
 					int num = bMessage.getCSN()-1 < 0? 0 : bMessage.getCSN();
 					toCommit.addAll(commitedWrites.subList(num, CSN));
 				}
+
+				
+				//add necessary entries into bMessage version vector.
+				for(Entry<List<Long>,Long> e : versionVector.entrySet()) {
+					if(bMessage.getVersionVector().get(e.getKey()) == null) {
+						//to decide whether to send everything or send nothing.
+						//get keys parent.											
+						if(hasReceiverRetired(bMessage,e.getKey()) == false) {
+							bMessage.getVersionVector().put(e.getKey(), 0L);	
+						} else {
+							bMessage.getVersionVector().put(e.getKey(), System.currentTimeMillis()+10000000000L);
+						}						
+					}
+				}
 				for(BayouMessage message : tentativeWrites) {
 					Long rAcceptCount = bMessage.getVersionVector().get(message.getReplicaId());
-					if(rAcceptCount==null || message.getRequest().getAcceptStamp() > rAcceptCount) {
+					if(rAcceptCount!=null && message.getRequest().getAcceptStamp() > rAcceptCount) {
 						tentative.add(message);
 					}
 				}
@@ -232,11 +277,70 @@ public class Replica extends Process {
 						//deleteCommitted(bMessage.getTentativeMessages());
 						updateTentativeWrites(bMessage.getTentativeMessages());
 						performWrites();
+						if(bMessage.isBecomePrimary()) {
+							isPrimary = true;
+							System.out.println(this.processId+"just became primary!!");
+						}
 					}
 				}
-					
+
 			}
 		}
+		
+		//retirement
+		BayouMessage msg = new BayouMessage();
+		msg.setReplicaId(replicaId);
+		msg.setRequest(new BayouRequest());
+		msg.setMessageType(BayouMessageEnum.RETIRE);
+		msg.getRequest().setAcceptStamp(System.currentTimeMillis());
+		tentativeWrites.add(msg);
+		
+		for(Entry<List<Long>,Boolean> neighborEntry : neighbors.entrySet()) {
+			BayouMessage mesg = new BayouMessage();
+			mesg.setReplicaId(replicaId);
+			mesg.setMessageType(BayouMessageEnum.INIT_ENTROPY);
+			sendMessage(this.main.processMap.get(neighborEntry.getKey()), mesg);
+			break;
+		}
+		
+		boolean isEntropyCompleted = false;
+		//wait for init entropy response from neighbor1
+		while(!isEntropyCompleted) {
+			if(!messages.list.isEmpty()) {
+				List<BayouMessage> msgs = new ArrayList<BayouMessage>(messages.list);
+				for(BayouMessage mesg : msgs) {
+					if(mesg.getMessageType().equals(BayouMessageEnum.INIT_ENTROPY_RESP)) {
+
+						System.out.println(this.processId+": Init Entropy Response Received");
+						List<BayouMessage> tentative = new ArrayList<BayouMessage>();
+						List<BayouMessage> toCommit = new ArrayList<BayouMessage>();
+						if(CSN > mesg.getCSN()) {
+							int num = mesg.getCSN()-1 < 0? 0 : mesg.getCSN();
+							toCommit.addAll(commitedWrites.subList(num, CSN));
+						}
+						for(BayouMessage message : tentativeWrites) {
+							Long rAcceptCount = mesg.getVersionVector().get(message.getReplicaId());
+							if(rAcceptCount==null || message.getRequest().getAcceptStamp() > rAcceptCount) {
+								tentative.add(message);
+							}
+						}
+						BayouMessage msg1 = new BayouMessage();
+						msg1.setBecomePrimary(isPrimary);
+						msg1.setMessageType(BayouMessageEnum.ENTROPY_ADD_WRITES);
+						msg1.setTentativeMessages(tentative);
+						System.out.println(this.processId+"tocommit size:"+toCommit.size());
+						msg1.setCommitMessages(toCommit);
+						msg1.setReplicaId(replicaId);
+						sendMessage(mesg.getSrcId(),msg1);
+						isEntropyCompleted = true;
+						break;
+					}
+				}
+			}
+		}
+		
+		// time pass
+		while(true) {Thread.sleep(100);}
 	}
 
 	private synchronized void updateCommittedWrites(List<BayouMessage> toCommit) {
@@ -271,14 +375,8 @@ public class Replica extends Process {
 		List<BayouMessage> old = new ArrayList<BayouMessage>(tentativeWrites);
 		int s1,s2,i,j;
 		i=j=0;		
-		writeToLog(this.processId+"Old Tentative Writes:");
 		for(BayouMessage msg : tentativeWrites) {
 			toInclude.remove(msg);
-			writeToLog(msg.toString());
-		}
-		writeToLog(this.processId+"Writes Received:");
-		for(BayouMessage msg : toInclude) {
-			writeToLog(msg.toString());
 		}
 		s1 = tentativeWrites.size(); s2 = toInclude.size();
 		while(i<s1 && j < s2) {
@@ -288,7 +386,6 @@ public class Replica extends Process {
 					(tentativeWrites.get(i).getRequest().getAcceptStamp() == toInclude.get(j).getRequest().getAcceptStamp())
 					&&(tentativeWrites.get(i).getReplicaId().equals(toInclude.get(j).getReplicaId()) )
 					){
-				System.err.println("same values found:");
 				res.add(toInclude.get(j));
 				i++;
 				j++;
@@ -320,7 +417,7 @@ public class Replica extends Process {
 			j++;
 			writeToLog(this.processId+"tempTent3:i,j"+i+","+j+","+res);
 		}
-	    tentativeWrites = res;
+		tentativeWrites = res;
 
 		for(BayouMessage msg : tentativeWrites) {
 			if(versionVector.get(msg.getReplicaId()) == null ||
@@ -346,8 +443,9 @@ public class Replica extends Process {
 		playList.clear();
 		executeRequest(commitedWrites);
 		executeRequest(tentativeWrites);
+		clearAndWriteFile(playList.toString(), "PLAYLIST");
 	}
-	
+
 	private void executeRequest(BayouRequest request) {
 		if(BayouRequestEnum.ADD.equals(request.getOperation())) {
 			playList.put(request.getKey(), request.getValue());
@@ -355,11 +453,15 @@ public class Replica extends Process {
 			playList.put(request.getKey(), request.getValue());
 		} else if(BayouRequestEnum.DELETE.equals(request.getOperation())){
 			playList.remove(request.getKey());
-		}
+		} 
 	}
 
 	private void executeRequest(List<BayouMessage> messages) {
 		for(BayouMessage mesg: messages) {
+			if(BayouMessageEnum.RETIRE.equals(mesg.getMessageType())) {
+				versionVector.remove(mesg.getReplicaId());
+				continue;
+			}
 			executeRequest(mesg.getRequest());
 		}
 	}
