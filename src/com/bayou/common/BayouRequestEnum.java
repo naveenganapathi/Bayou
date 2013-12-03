@@ -3,7 +3,8 @@ package com.bayou.common;
 public enum BayouRequestEnum {
 	ADD("add"),
 	EDIT("edit"),
-	DELETE("delete");
+	DELETE("delete"),
+	READ("read");
 	String messageLabel;
 	BayouRequestEnum(String message) {
             this.messageLabel=message;

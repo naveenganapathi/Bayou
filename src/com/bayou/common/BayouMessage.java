@@ -15,6 +15,15 @@ public class BayouMessage {
 	boolean becomePrimary = false;
 	List<BayouMessage> tentativeMessages;
 	List<BayouMessage> commitMessages;
+	String responseMessage;
+	Map<String,String> playList;
+	long ts;
+	String csid;
+	
+	
+	
+	
+	
 
 	
 	public BayouMessageEnum getMessageType() {
@@ -104,5 +113,37 @@ public class BayouMessage {
 
 	public void setBecomePrimary(boolean becomePrimary) {
 		this.becomePrimary = becomePrimary;
+	}
+
+	public String getResponseMessage() {
+		return responseMessage;
+	}
+
+	public void setResponseMessage(String responseMessage) {
+		this.responseMessage = responseMessage;
+	}
+
+	public Map<String, String> getPlayList() {
+		return playList;
+	}
+
+	public void setPlayList(Map<String, String> playList) {
+		this.playList = playList;
+	}
+
+	public long getTs() {
+		return ts;
+	}
+
+	public void setTs(long ts) {
+		this.ts = ts;
+	}
+
+	public String getCsid() {
+		return csid;
+	}
+
+	public void setCsid(String csid) {
+		this.csid = csid;
 	}
 }
