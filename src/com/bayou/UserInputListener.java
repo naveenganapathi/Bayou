@@ -131,11 +131,17 @@ public class UserInputListener extends Process {
 		Replica r1 = (Replica) main.processes.get(src);
 		Replica r2 = (Replica) main.processes.get(dest);
 		if(r1.neighbors.containsKey(r2.replicaId)) {
+			//System.err.println("Setting this connection "+src+","+dest+" to "+val);
 			r1.neighbors.put(r2.replicaId, val);
 		}
 		if(r2.neighbors.containsKey(r1.replicaId)) {
+			//System.err.println("Setting this connection "+dest+","+src+" to "+val);
 			r2.neighbors.put(r1.replicaId, val);
 		}
+//		System.out.println("Neighbor list of "+src);
+//		System.out.println(r1.neighbors);
+//		System.out.println("Neighbor list of "+dest);
+//		System.out.println(r2.neighbors);
 	}
 	
 	public void body() throws Exception {

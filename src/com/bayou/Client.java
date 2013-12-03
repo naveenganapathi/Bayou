@@ -29,7 +29,7 @@ public class Client extends Process {
 				BufferedReader br = new BufferedReader(new FileReader(this.processId.replaceAll(":", "_")+"_INP.txt"));
 				String temp = null;
 				while((temp = br.readLine()) != null) {
-					Thread.sleep(9000);
+					Thread.sleep(4000);
 					String[] vals = temp.split(",");
 					BayouRequest r = new BayouRequest(BayouRequestEnum.valueOf(vals[0]),vals[1],vals[2],clientCommandId++);
 					BayouMessage m = new BayouMessage();
